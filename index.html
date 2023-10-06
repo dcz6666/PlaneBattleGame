@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <link rel="stylesheet" href="css/index.css" />
+  <body>
+    <div id="stage">
+      <canvas id="canvas" width="480" height="650"></canvas>
+    </div>
+  </body>
+  <!-- <script src="/js/config.js"></script>
+  <script src="/js/Sky.js"></script> -->
+  <script>
+    // 1、让画布绘制图片
+    // 1.1 找到这个画布
+    const canvas = document.querySelector("#canvas");
+    //1.2 利用这个画布初始化一个2D的画笔
+    const context = canvas.getContext("2d");
+    //2 加载这张图片 图片加载初始化 这个过程是异步的
+    const bg = new Image();
+    bg.src = "img/bg/bg.jpg";
+
+    const copyright = new Image();
+    copyright.src = "img/logo/logo.webp";
+
+    //定义游戏的状态
+    //开始
+    let START = 0;
+    //开始时
+    let STARTING = 1;
+    //运行中
+    let RUNNING = 2;
+    //暂停时
+    let PAUSE = 3;
+    //结束时
+    let END = 4;
+
+    const loading_frame = [];
+    for (let i = 0; i <= 4; i++) {
+      loading_frame[i] = new Image();
+      loading_frame[i].src = `img/loading/loading-${i + 1}.png`;
+    }
+    // console.log("loading_frame[i]",loading_frame);
+
+    const hero_frame = { live: [], death: [] };
+    for (let i = 0; i < 2; i++) {
+      hero_frame.live[i] = new Image();
+      hero_frame.live[i].src = `img/hero/hero_live_${i + 1}.png`;
+    }
+    for (let i = 0; i < 3; i++) {
+      hero_frame.death[i] = new Image();
+      hero_frame.death[i].src = `img/hero/hero_death_${i + 1}.png`;
+    }
+    //天空背景类
+    class Sky {
+      constructor(config) {
+        //静态属性
+        console.log("config", config);
+        this.bg = config.bg;
+        this.width = config.width;
+        this.height = config.height;
+        this.speed = config.speed;
+        this.x1 = 0;
+        this.y1 = 0;
+        this.x2 = 0;
+        this.y2 = -this.height;
+        this.lastTime = new Date().getTime();
+      }
+      //判断这个时间段天空是否需要移动y1,y2++
+      //拿到当前时间节点 有一个速度节点 拿到一个历史时间
+      //当前时间-速度时间 如果大于历史时间的话 那么就需要移动
+      judge() {
+        let currentTime = new Date().getTime();
+        if (currentTime - this.lastTime >= this.speed) {
+          this.y1++;
+          this.y2++;
+          this.lastTime = new Date().getTime();
+        }
+        if (this.y2 == 0) {
+          this.y1 = 0;
+          this.y2 = -this.height;
+        }
+      }
+      //动态方法
+      paint(context) {
+        context.drawImage(this.bg, this.x1, this.y1, this.width, this.height);
+        context.drawImage(this.bg, this.x2, this.y2, this.width, this.height);
+      }
+    }
+    const SkyConfig = {
+      bg: bg,
+      width: 480,
+      height: 650,
+      speed: 10,
+    };
+
+    const sky = new Sky(SkyConfig);
+    let state = START;
+
+    //loading 类
+    const LoadingConfig = {
+      frames: loading_frame,
+      width: 197,
+      height: 193,
+      x: 0,
+      y: 650 - 193,
+      speed: 100,
+    };
+
+    class Loading {
+      constructor(config) {
+        this.frames = config.frames;
+        this.width = config.width;
+        this.height = config.height;
+        this.x = config.x;
+        this.y = config.y;
+        this.speed = config.speed;
+        this.lastTime = new Date().getTime();
+        this.currentIndex = 0;
+      }
+      paint(context) {
+        context.drawImage(
+          this.frames[this.currentIndex],
+          this.x,
+          this.y,
+          this.width,
+          this.height
+        );
+      }
+      judge() {
+        let currentTime = new Date().getTime();
+        if (currentTime - this.lastTime > this.speed) {
+          this.currentIndex++;
+          if (this.currentIndex == 4) {
+            console.log("123456");
+            state = RUNNING;
+          }
+          this.lastTime = currentTime;
+        }
+      }
+    }
+    const loading = new Loading(LoadingConfig);
+
+    // 英雄配置
+    const HeroConfig = {
+      frames: hero_frame,
+      width: 128,
+      height: 128,
+      speed: 200,
+    };
+    class Hero {
+      constructor(config) {
+        this.frames = config.frames;
+        this.width = config.width;
+        this.height = config.height;
+        this.x = (480 - config.height) / 2;
+        this.y = 650 - config.height;
+        this.speed = config.speed;
+        this.img = null; //当前展示的图片
+        this.live = true;
+        this.lastTime = new Date().getTime();
+        this.framesLiveIndex = 0;
+        this.framesDeathIndex = 0;
+      }
+      judge() {
+        let currentTime = new Date().getTime();
+        if (currentTime - this.lastTime > this.speed) {
+          this.img =this.frames.live[this.framesLiveIndex++ % this.frames.live.length];
+          this.lastTime = currentTime;
+        }
+      }
+
+      paint(context) {
+          
+        context.drawImage(this.img, this.x, this.y, this.width, this.height);
+      }
+    }
+
+    const hero = new Hero(HeroConfig);
+
+    canvas.addEventListener('mousemove',(e)=>{
+        console.log("move",e);
+        hero.x= e.offsetX- hero.width/2;
+        hero.y= e.offsetY-hero.height/2;
+
+    })
+
+    //为canvas绑定一个点击事件且他如果Start状态的时候需要改成starting状态
+    canvas.addEventListener("click", () => {
+      if (state == START) {
+        state = STARTING;
+      }
+    });
+    //图片加载
+    bg.addEventListener("load", () => {
+      setInterval(() => {
+        switch (state) {
+          case START:
+            sky.paint(context);
+            sky.judge();
+            //渲染飞机大战logo
+            let logo_x = (480 - copyright.naturalWidth) / 2;
+            let logo_y = (650 - copyright.naturalHeight) / 2;
+            context.drawImage(copyright, logo_x, logo_y);
+            break;
+          case STARTING:
+            sky.paint(context);
+            sky.judge();
+            loading.paint(context);
+            loading.judge();
+            break;
+          case RUNNING:
+            sky.paint(context);
+            sky.judge();
+            hero.judge();
+            hero.paint(context);
+            break;
+          case PAUSE:
+            break;
+          case END:
+            break;
+          default:
+            break;
+        }
+      }, 10);
+    });
+  </script>
+</html>
