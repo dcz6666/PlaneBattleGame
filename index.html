@@ -55,6 +55,43 @@
       hero_frame.death[i] = new Image();
       hero_frame.death[i].src = `img/hero/hero_death_${i + 1}.png`;
     }
+
+    const b = new Image();
+    b.src = "img/bullet/bullet.png";
+    // 天空背景配置
+    const SkyConfig = {
+      bg: bg,
+      width: 480,
+      height: 650,
+      speed: 10,
+    };
+
+  
+    let state = START;
+
+    //loading 配置
+    const LoadingConfig = {
+      frames: loading_frame,
+      width: 197,
+      height: 193,
+      x: 0,
+      y: 650 - 193,
+      speed: 100,
+    };
+    // 英雄配置
+    const HeroConfig = {
+      frames: hero_frame,
+      width: 128,
+      height: 128,
+      speed: 200,
+    };
+
+    //子弹配置项
+    const BulletConfig = {
+      img: b,
+      width: 20,
+      height: 58,
+    };
     //天空背景类
     class Sky {
       constructor(config) {
@@ -91,25 +128,7 @@
         context.drawImage(this.bg, this.x2, this.y2, this.width, this.height);
       }
     }
-    const SkyConfig = {
-      bg: bg,
-      width: 480,
-      height: 650,
-      speed: 10,
-    };
-
     const sky = new Sky(SkyConfig);
-    let state = START;
-
-    //loading 类
-    const LoadingConfig = {
-      frames: loading_frame,
-      width: 197,
-      height: 193,
-      x: 0,
-      y: 650 - 193,
-      speed: 100,
-    };
 
     class Loading {
       constructor(config) {
@@ -136,7 +155,6 @@
         if (currentTime - this.lastTime > this.speed) {
           this.currentIndex++;
           if (this.currentIndex == 4) {
-            console.log("123456");
             state = RUNNING;
           }
           this.lastTime = currentTime;
@@ -145,19 +163,12 @@
     }
     const loading = new Loading(LoadingConfig);
 
-    // 英雄配置
-    const HeroConfig = {
-      frames: hero_frame,
-      width: 128,
-      height: 128,
-      speed: 200,
-    };
     class Hero {
       constructor(config) {
         this.frames = config.frames;
         this.width = config.width;
         this.height = config.height;
-        this.x = (480 - config.height) / 2;
+        this.x = (480 - config.width) / 2;
         this.y = 650 - config.height;
         this.speed = config.speed;
         this.img = null; //当前展示的图片
@@ -165,29 +176,62 @@
         this.lastTime = new Date().getTime();
         this.framesLiveIndex = 0;
         this.framesDeathIndex = 0;
+        //子弹上次射击的时间
+        this.lastShootTime = new Date().getTime();
+        //子弹射击的间隔
+        this.shootInterval = 200;
+        //子弹夹数组
+        this.bulletList = [];
       }
       judge() {
         let currentTime = new Date().getTime();
         if (currentTime - this.lastTime > this.speed) {
-          this.img =this.frames.live[this.framesLiveIndex++ % this.frames.live.length];
+          this.img =
+            this.frames.live[this.framesLiveIndex++ % this.frames.live.length];
           this.lastTime = currentTime;
         }
       }
 
       paint(context) {
-          
         context.drawImage(this.img, this.x, this.y, this.width, this.height);
+      }
+      //英雄可以射击子弹
+      shoot() {
+        //获取当前时间
+        const currentTime = new Date().getTime();
+        if (currentTime - this.lastShootTime > this.shootInterval) {
+          let x = this.x + this.width / 2 - BulletConfig.width/2;
+          let y = this.y - BulletConfig.height;
+          //在飞机上的头部初始化一个子弹对象
+          let bullet = new Bullet(BulletConfig, x, y);
+          //英雄飞机要认领这个子弹
+          this.bulletList.push(bullet);
+          //绘制一个子弹对象
+          bullet.paint(context)
+          //更新英雄射击事件
+          this.lastShootTime= currentTime
+        }
       }
     }
 
+    class Bullet {
+      constructor(config,x,y) {
+        this.img = config.img;
+        this.width = config.width;
+        this.height = config.height;
+        this.x = x;
+        this.y =y;
+      }
+      paint(context) {
+        context.drawImage(this.img, this.x, this.y, this.width, this.height);
+      }
+    }
     const hero = new Hero(HeroConfig);
 
-    canvas.addEventListener('mousemove',(e)=>{
-        console.log("move",e);
-        hero.x= e.offsetX- hero.width/2;
-        hero.y= e.offsetY-hero.height/2;
-
-    })
+    canvas.addEventListener("mousemove", (e) => {
+      hero.x = e.offsetX - hero.width / 2;
+      hero.y = e.offsetY - hero.height / 2;
+    });
 
     //为canvas绑定一个点击事件且他如果Start状态的时候需要改成starting状态
     canvas.addEventListener("click", () => {
@@ -218,6 +262,7 @@
             sky.judge();
             hero.judge();
             hero.paint(context);
+            hero.shoot();
             break;
           case PAUSE:
             break;
