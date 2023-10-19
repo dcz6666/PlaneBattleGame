@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <link rel="stylesheet" href="css/index.css" />
+  <body>
+    <div id="stage">
+      <canvas id="canvas" width="480" height="650"></canvas>
+    </div>
+  </body>
+  <!-- <script src="/js/config.js"></script>
+  <script src="/js/Sky.js"></script> -->
+  <script>
+    // 1、让画布绘制图片
+    // 1.1 找到这个画布
+    const canvas = document.querySelector("#canvas");
+    //1.2 利用这个画布初始化一个2D的画笔
+    const context = canvas.getContext("2d");
+    //2 加载这张图片 图片加载初始化 这个过程是异步的
+    const bg = new Image();
+    bg.src = "img/bg/bg.jpg";
+
+    const copyright = new Image();
+    copyright.src = "img/logo/logo.webp";
+
+    //定义游戏的状态
+    //开始
+    let START = 0;
+    //开始时
+    let STARTING = 1;
+    //运行中
+    let RUNNING = 2;
+    //暂停时
+    let PAUSE = 3;
+    //结束时
+    let END = 4;
+
+    const loading_frame = [];
+    for (let i = 0; i <= 4; i++) {
+      loading_frame[i] = new Image();
+      loading_frame[i].src = `img/loading/loading-${i + 1}.png`;
+    }
+    // console.log("loading_frame[i]",loading_frame);
+
+    const hero_frame = { live: [], death: [] };
+    for (let i = 0; i < 2; i++) {
+      hero_frame.live[i] = new Image();
+      hero_frame.live[i].src = `img/hero/hero_live_${i + 1}.png`;
+    }
+    for (let i = 0; i < 3; i++) {
+      hero_frame.death[i] = new Image();
+      hero_frame.death[i].src = `img/hero/hero_death_${i + 1}.png`;
+    }
+
+    const b = new Image();
+    b.src = "img/bullet/bullet.png";
+
+    const e1 = { live: [], death: [] };
+    for (let i = 0; i < 2; i++) {
+      e1.live[i] = new Image();
+      e1.live[i].src = `img/enemy/e1_live_${i + 1}.png`;
+      e1.death[i] = new Image();
+      e1.death[i].src = `img/enemy/e1_death_${i + 1}.png`;
+    }
+
+    const e2 = { live: [], death: [] };
+    for (let i = 0; i < 2; i++) {
+      e2.live[i] = new Image();
+      e2.live[i].src = `img/enemy/e2_live_${i + 1}.png`;
+      e2.death[i] = new Image();
+      e2.death[i].src = `img/enemy/e2_death_${i + 1}.png`;
+    }
+
+    const e3 = { live: [], death: [] };
+    for (let i = 0; i < 2; i++) {
+      e3.live[i] = new Image();
+      e3.live[i].src = `img/enemy/e3_live_${i + 1}.png`;
+      e3.death[i] = new Image();
+      e3.death[i].src = `img/enemy/e3_death_${i + 1}.png`;
+    }
+
+    // 天空背景配置
+    const SkyConfig = {
+      bg: bg,
+      width: 480,
+      height: 650,
+      speed: 10,
+    };
+
+    let state = START;
+
+    //loading 配置
+    const LoadingConfig = {
+      frames: loading_frame,
+      width: 197,
+      height: 193,
+      x: 0,
+      y: 650 - 193,
+      speed: 100,
+    };
+    // 英雄配置
+    const HeroConfig = {
+      frames: hero_frame,
+      width: 128,
+      height: 128,
+      speed: 200,
+    };
+
+    //子弹配置项
+    const BulletConfig = {
+      img: b,
+      width: 20,
+      height: 58,
+    };
+
+    //小敌机配置项
+    const E1 = {
+      type: 1,
+      width: 89,
+      height: 68,
+      life: 1,
+      score: 1,
+      frame: e1,
+      minSpeed: 20,
+      maxSpeed: 10,
+    };
+    const E2 = {
+      type: 2,
+      width: 197,
+      height: 134,
+      life: 5,
+      score: 5,
+      frame: e2,
+      minSpeed: 50,
+      maxSpeed: 20,
+    };
+    const E3 = {
+      type: 3,
+      width: 240,
+      height: 240,
+      life: 20,
+      score: 20,
+      frame: e3,
+      minSpeed: 100,
+      maxSpeed: 100,
+    };
+
+    //初始化暂停图片
+    const pause = new Image();
+    pause.src = "img/pause/pause.png";
+
+    //score 分数变量 life 变量
+    let score = 0;
+    let life = 3;
+
+    //天空背景类
+    class Sky {
+      constructor(config) {
+        //静态属性
+        console.log("config", config);
+        this.bg = config.bg;
+        this.width = config.width;
+        this.height = config.height;
+        this.speed = config.speed;
+        this.x1 = 0;
+        this.y1 = 0;
+        this.x2 = 0;
+        this.y2 = -this.height;
+        this.lastTime = new Date().getTime();
+      }
+      //判断这个时间段天空是否需要移动y1,y2++
+      //拿到当前时间节点 有一个速度节点 拿到一个历史时间
+      //当前时间-速度时间 如果大于历史时间的话 那么就需要移动
+      judge() {
+        let currentTime = new Date().getTime();
+        if (currentTime - this.lastTime >= this.speed) {
+          this.y1++;
+          this.y2++;
+          this.lastTime = new Date().getTime();
+        }
+        if (this.y2 == 0) {
+          this.y1 = 0;
+          this.y2 = -this.height;
+        }
+      }
+      //动态方法
+      paint(context) {
+        context.drawImage(this.bg, this.x1, this.y1, this.width, this.height);
+        context.drawImage(this.bg, this.x2, this.y2, this.width, this.height);
+      }
+    }
+    const sky = new Sky(SkyConfig);
+
+    class Loading {
+      constructor(config) {
+        this.frames = config.frames;
+        this.width = config.width;
+        this.height = config.height;
+        this.x = config.x;
+        this.y = config.y;
+        this.speed = config.speed;
+        this.lastTime = new Date().getTime();
+        this.currentIndex = 0;
+      }
+      paint(context) {
+        context.drawImage(
+          this.frames[this.currentIndex],
+          this.x,
+          this.y,
+          this.width,
+          this.height
+        );
+      }
+      judge() {
+        let currentTime = new Date().getTime();
+        if (currentTime - this.lastTime > this.speed) {
+          this.currentIndex++;
+          if (this.currentIndex == 4) {
+            state = RUNNING;
+          }
+          this.lastTime = currentTime;
+        }
+      }
+    }
+    const loading = new Loading(LoadingConfig);
+
+    class Hero {
+      constructor(config) {
+        this.frames = config.frames;
+        this.width = config.width;
+        this.height = config.height;
+        this.x = (480 - config.width) / 2;
+        this.y = 650 - config.height;
+        this.speed = config.speed;
+        this.img = null; //当前展示的图片
+        this.live = true;
+        this.lastTime = new Date().getTime();
+        this.framesLiveIndex = 0;
+        this.framesDeathIndex = 0;
+        //子弹上次射击的时间
+        this.lastShootTime = new Date().getTime();
+        //子弹射击的间隔
+        this.shootInterval = 400;
+        //子弹夹数组
+        this.bulletList = [];
+        this.destroy = false;
+      }
+      judge() {
+        let currentTime = new Date().getTime();
+        if (currentTime - this.lastTime > this.speed) {
+          if (this.live) {
+            this.img =
+              this.frames.live[
+                this.framesLiveIndex++ % this.frames.live.length
+              ];
+          } else {
+            this.img = this.frames.death[this.framesDeathIndex++];
+            console.log("  this.img ====",  this.img );
+            if (this.framesDeathIndex === this.frames.death.length) {
+              this.destroy = true;
+            }
+          }
+          this.lastTime = currentTime;
+        }
+      }
+
+      paint(context) {
+        console.log("this.img",this.img)
+        if(this.img)
+        context.drawImage(this.img, this.x, this.y, this.width, this.height);
+      }
+      //英雄可以射击子弹
+      shoot() {
+        //获取当前时间
+        const currentTime = new Date().getTime();
+        if (currentTime - this.lastShootTime > this.shootInterval) {
+          let x = this.x + this.width / 2 - BulletConfig.width / 2;
+          let y = this.y - BulletConfig.height;
+          //在飞机上的头部初始化一个子弹对象
+          let bullet = new Bullet(BulletConfig, x, y);
+          //英雄飞机要认领这个子弹
+          this.bulletList.push(bullet);
+          //绘制一个子弹对象
+          bullet.paint(context);
+          //更新英雄射击事件
+          this.lastShootTime = currentTime;
+        }
+      }
+
+      collide() {
+        //将活着的标识符切换为false
+        this.live = false;
+      }
+    }
+
+    class Bullet {
+      constructor(config, x, y) {
+        this.img = config.img;
+        this.width = config.width;
+        this.height = config.height;
+        this.x = x;
+        this.y = y;
+        this.destroy = false;
+      }
+      //子弹绘制方法
+      paint(context) {
+        context.drawImage(this.img, this.x, this.y);
+      }
+      //子弹移动方法
+      move() {
+        this.y -= 2;
+      }
+      outOfBounds() {
+        //如果返回的是真的话 那么我们应该销毁这个子弹
+        return this.y < -this.height;
+      }
+
+      collide() {
+        //让这颗子弹变成颗销毁的状态
+        this.destroy = true;
+      }
+    }
+    let hero = new Hero(HeroConfig);
+
+    //初始化一个敌机类
+    class Enemy {
+      constructor(config) {
+        //敌机类型
+        this.type = config.type;
+        //敌机宽度
+        this.width = config.width;
+        //敌机高度
+        this.height = config.height;
+        //敌机初始位置
+        this.x = Math.floor(Math.random() * (480 - config.width));
+        this.y = -config.height;
+        //敌机生命
+        this.life = config.life;
+        //敌机分数
+        this.score = config.score;
+        //敌机图片库
+        this.frame = config.frame;
+        //此时此刻展示的图片
+        this.img = this.frame.live[0];
+        //活着的标识
+        this.live = true;
+        this.minSpeed = config.minSpeed;
+        this.maxSpeed = config.maxSpeed;
+
+        //敌机速度
+        this.speed =
+          Math.floor(Math.random() * (config.minSpeed - config.maxSpeed + 1)) +
+          config.maxSpeed;
+
+        //最后时间 表示在这个时间段 它是不变化的 但是过了这时间就要变化
+        this.lastTime = new Date().getTime();
+
+        //死亡下标
+        this.deathIndex = 0;
+        //确认销毁
+        this.destroy = false;
+      }
+      //判断是否需要渲染 是否移动
+      move() {
+        const currentTime = new Date().getTime();
+        if (currentTime - this.lastTime >= this.speed) {
+          //如果这架飞机活着的 那么就直接播放活着的图片地址
+          if (this.live) {
+            this.img = this.frame.live[0];
+            this.y++;
+          } else {
+            //死的时候播放死亡动画
+            this.img = this.frame.death[this.deathIndex++];
+            console.log("this.frame.death.length", this.frame.death.length);
+            //如果死亡动画播放完毕之后就要销毁掉这架敌机
+            if (this.deathIndex === this.frame.death.length) {
+              this.destroy = true;
+            }
+          }
+          //修正上一次时间
+          this.lastTime = currentTime;
+        }
+      }
+      //渲染敌机
+      paint(context) {
+        context.drawImage(this.img, this.x, this.y);
+      }
+      //检测敌机是否飞出边界
+      outOfBounds() {
+        if (this.y > 650) {
+          return true;
+        }
+      }
+
+      //检测敌机是有有撞到其他物体
+      //其他 e 敌机
+      //子弹 o
+      hit(o) {
+        //敌机的左边
+        let el = this.x;
+        //敌机的右边
+        let er = this.x + this.width;
+        //敌机的顶边
+        let et = this.y;
+        //敌机的底部
+        let eb = this.y + this.height;
+
+        //子弹的左边
+        let ol = o.x;
+        //子弹的右边
+        let or = o.x + o.width;
+        //子弹的顶边
+        let ot = o.y;
+        //子弹的底部
+        let ob = o.y + o.height;
+        //判断他是否碰到
+        if (ol > er || or < el || ot > eb || ob < et) {
+          //没碰到
+          return false;
+        } else {
+          return true;
+        }
+      }
+
+      collide() {
+        //中弹了 生命减少1
+        console.log("this.life====", this.life);
+        this.life--;
+        // 当这个实例的生命降低为0的时候 就需要调用其他方法
+        if (this.life === 0) {
+          //将live 标识标记为死亡状态
+          this.live = false;
+          score += this.score;
+        }
+      }
+      //敌机销毁
+      outOfBounds() {}
+    }
+    canvas.addEventListener("mousemove", (e) => {
+      hero.x = e.offsetX - hero.width / 2;
+      hero.y = e.offsetY - hero.height / 2;
+    });
+
+    //为canvas绑定一个点击事件且他如果Start状态的时候需要改成starting状态
+    canvas.addEventListener("click", () => {
+      if (state == START) {
+        state = STARTING;
+      }
+    });
+
+    //为canvas 绑定一个鼠标离开事件鼠标离开时RUNING ->PAUSE
+    canvas.addEventListener("mouseleave", () => {
+      if (state == RUNNING) {
+        state = PAUSE;
+      }
+    });
+    //为canvas 绑定一个鼠标离开事件鼠标进入时PAUSE->RUNING
+    canvas.addEventListener("mouseenter", () => {
+      if (state == PAUSE) {
+        state = RUNNING;
+      }
+    });
+
+    //碰撞检测函数
+    function checkHit() {
+      //遍历所有的敌机
+      for (let i = 0; i < enemies.length; i++) {
+        if (enemies[i].hit(hero)) {
+          //敌机和英雄发生碰撞
+          enemies[i].collide();
+          hero.collide();
+        }
+        //遍历所有子弹
+        for (let j = 0; j < hero.bulletList.length; j++) {
+          //用第i的敌机和第j个子弹进行碰撞检测 返回的是一个布尔类型
+          if (enemies[i].hit(hero.bulletList[j])) {
+            console.log("碰撞到了");
+            //清除这架敌机 清除这颗子弹
+            enemies[i].collide();
+            hero.bulletList[j].collide();
+          }
+        }
+      }
+    }
+
+    // 全局函数来判断所有子弹/敌人组件
+    function judgeComponent() {
+      for (let i = 0; i < hero.bulletList.length; i++) {
+        hero.bulletList[i].move();
+      }
+      for (let i = 0; i < enemies.length; i++) {
+        enemies[i].move();
+      }
+    }
+    // 全局函数来绘制所有子弹/敌人组件 /绘制score &life面板
+    function paintComponent() {
+      for (let i = 0; i < hero.bulletList.length; i++) {
+        hero.bulletList[i].paint(context);
+      }
+      for (let i = 0; i < enemies.length; i++) {
+        enemies[i].paint(context);
+      }
+      //绘制score & lift 面板
+      context.font = "20px 微软雅黑";
+      context.fillStyle = "red";
+      context.textAlign = "left";
+      context.fillText("score:" + score, 10, 20);
+      context.textAlign = "right";
+      context.fillText("life:" + life, 480 - 10, 20);
+
+      //重置代码 画笔重置为 黑色 左对齐
+      context.textAlign = "left";
+      context.fillStyle = "black";
+    }
+    // 全局函数来销毁所有子弹/敌人组件 /销毁英雄
+    function deleteComponent() {
+      if (hero.destroy) {
+        //生命-1
+        life--
+        hero.destroy=false
+        //当生命值降低为0的时候进入游戏结束状态
+        if (life == 0) {
+          //游戏结束
+          state = END;
+          console.log("游戏结束");
+        }else{
+          //死了一次之后 重新初始化一个英雄实例
+           hero = new Hero(HeroConfig);
+        }
+      }
+      for (let i = 0; i < hero.bulletList.length; i++) {
+        //判断有没有飞出边界 或者destroy :true
+        if (hero.bulletList[i].outOfBounds() || hero.bulletList[i].destroy) {
+          hero.bulletList.splice(i, 1);
+        }
+      }
+
+      for (let i = 0; i < enemies.length; i++) {
+        //如果敌机处于一种销毁状态 destroy:true
+        if (enemies[i].outOfBounds() || enemies[i].destroy) {
+          enemies.splice(i, 1);
+        }
+      }
+    }
+    //该变量存放所有敌机实例
+    let enemies = [];
+    //敌机产生的速率
+    let ENEMY_CREATE_INTERVAL = 800;
+    let ENEMY_LASTTIME = new Date().getTime();
+
+    //全局函数 隔一段事件就来初始化一架飞机
+    function createComponent() {
+      let currentTime = new Date().getTime();
+      if (currentTime - ENEMY_LASTTIME >= ENEMY_CREATE_INTERVAL) {
+        //当时间满足 实例化一架敌机 放入敌机数组中
+        let ran = Math.floor(Math.random() * 100);
+        if (ran < 60) {
+          //产生一架小飞机
+          enemies.push(new Enemy(E1));
+        } else if (ran > 60 && ran < 90) {
+          //产生一架中飞机
+          enemies.push(new Enemy(E2));
+        } else {
+          //产生一架大飞机
+          enemies.push(new Enemy(E3));
+        }
+        ENEMY_LASTTIME = currentTime;
+      }
+      // console.log("enemies", enemies);
+    }
+
+    //图片加载
+    bg.addEventListener("load", () => {
+      setInterval(() => {
+        switch (state) {
+          case START:
+            sky.paint(context);
+            sky.judge();
+            //渲染飞机大战logo
+            let logo_x = (480 - copyright.naturalWidth) / 2;
+            let logo_y = (650 - copyright.naturalHeight) / 2;
+            context.drawImage(copyright, logo_x, logo_y);
+            break;
+          case STARTING:
+            sky.paint(context);
+            sky.judge();
+            loading.paint(context);
+            loading.judge();
+            break;
+          case RUNNING:
+            sky.paint(context);
+            sky.judge();
+            hero.judge();
+            hero.paint(context);
+            hero.shoot();
+            createComponent();
+            judgeComponent();
+            deleteComponent();
+            paintComponent();
+            checkHit();
+            break;
+          case PAUSE:
+            //渲染飞机大战logo
+            let pause_x = (480 - pause.naturalWidth) / 2;
+            let pause_y = (650 - pause.naturalHeight) / 2;
+            context.drawImage(pause, pause_x, pause_y);
+            break;
+          case END:
+            context.font = "bold 24px 微软雅黑";
+            context.fillText("GAME_OVER", 480 / 2, 650 / 2);
+            context.textAlign = "center";
+            context.textBaseLine = "middle";
+            break;
+          default:
+            break;
+        }
+      }, 10);
+    });
+  </script>
+</html>
